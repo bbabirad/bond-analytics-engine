@@ -12,7 +12,7 @@ valuation_date = date(2026, 1, 15)
 maturity_date = date(2029, 1, 15)
 notional = 10000000
 spread = 0.0075
-cupon_frequency = 4
+
 
 print("Valuation date:", valuation_date)
 print("Maturity date:", maturity_date)
@@ -30,11 +30,6 @@ for months in pillar_months:
     t = days/365
     pillars.append(t)
 
-'''
-#maturity pillar conversion test.
-for months, t in zip(pillar_months, pillars):
-    print(f"{months}M: {t:.9f} years")
-'''
 
 projection_rates = [
     0.0272, 0.0276, 0.0281,
@@ -53,22 +48,11 @@ def interpolate_rate(t, pillars, rates):
     return np.interp(t, pillars, rates)
 
 
-'''
-print("INTERPROLATION TESTS")
-t= 4/12
-rate =  interpolate_rate(t, pillars, projection_rates)
-
-print(rate)
-'''
 #Returns the discount factor for a given time t, given a set of pillars and rates
 def discount_factor(t, pillars, rates):
     rate = interpolate_rate(t, pillars, rates)
     return np.exp(-rate*t)
-'''
-print("DISCOUNT FACTOR TESTS")
-df = discount_factor(1, pillars, discount_rates)
-print(f"1-year discount factor: {df:.9f}")
-'''
+
 
 #Generate Quarterly Cupon Dates
 payment_dates = []
@@ -79,168 +63,7 @@ while current_date < maturity_date:
     current_date += relativedelta(months=3)
     payment_dates.append(current_date)
 
-'''
-#Output List in Table Format
-print("\nCupon Payment Dates:")
-for i, payment_date in enumerate(payment_dates, start=1):
-    print(f"Cupon {i}: {payment_date}")
-'''
-#Calculate Cupon Accrual Periods
 
-previous_date = valuation_date
-
-accrual_periods = []
-
-for payment_date in payment_dates:
-    days = (payment_date - previous_date).days
-    alpha = days/365
-    accrual_periods.append(alpha)
-
-    '''
-    print(f"{previous_date} to {payment_date}: "
-          f"{days} days, alpha = {alpha:.6f}"
-          )
-    '''
-    previous_date = payment_date
-
-#FIND FORWARD RATES
-
-def forward_rate(start_date, end_date):
-    t1 = (start_date - valuation_date).days/365
-    t2 = (end_date - valuation_date).days/365
-
-    alpha = (end_date - start_date).days/365
-
-    #AT VALUTATION DATE, THE DISCOUNT FACTOR EQUALS 1
-
-    if t1 == 0:
-        df1 = 1.0
-    else:
-        df1 = discount_factor(t1, pillars, projection_rates)
-
-    df2 = discount_factor(t2, pillars, projection_rates)
-
-    forward = (df1 / df2 - 1) / alpha
-
-    return forward
-
-'''
-FIRST FORWARD RATE TEST
-
-first_forward = forward_rate(
-    valuation_date,
-    payment_dates[0]
-)
-
-print(f"First forward rate: {first_forward:.6%}")
-
-'''
-
-#CALCULATE THE PROJECTED COUPON CASH FLOWS
-
-cashflows = []
-previous_date = valuation_date
-
-for i, payment_date in enumerate(payment_dates, start=1):
-    alpha = (payment_date - previous_date).days/365
-    forward = forward_rate(previous_date, payment_date)
-    coupon = notional * (forward + spread) * alpha
-    cashflows.append(coupon)
-
-    '''
-    print(
-        f"Coupon {i}: "
-        f"Forward = {forward:.6%}, "
-        f"Cash Flow = ${coupon:,.2f}"
-    )
-    '''
-
-    previous_date = payment_date
-
-
-#PRESENT VALUES OF CASH FLOWS
-
-coupon_present_values = []
-
-for payment_date, coupon in zip(payment_dates, cashflows):
-    t = (payment_date - valuation_date).days/365
-
-    df = discount_factor(t, pillars, discount_rates)
-
-    pv = coupon * df
-
-    coupon_present_values.append(pv)
-
-    '''
-    print(
-        f"Date: {payment_date}, "
-        f"DF: {df:.9f}, "
-        f"PV: ${pv:,.2f}"
-    )
-    '''
-
-# Present value of principal repayment
-
-T = (maturity_date - valuation_date).days / 365
-
-principal_df = discount_factor(T, pillars, discount_rates)
-
-principal_pv = notional * principal_df
-
-#TOTAL THEORETICAL NPV
-
-total_coupon_pv = sum(coupon_present_values)
-
-bond_npv = total_coupon_pv + principal_pv
-
-print("\nBond Valuation Results")
-print(f"PV of Coupons:   ${total_coupon_pv:,.2f}")
-print(f"PV of Principal: ${principal_pv:,.2f}")
-print(f"Theoretical NPV: ${bond_npv:,.2f}")
-
-'''
-ASSUMPTIONS Q1
-Unadjusted quarterly payment dates.
-Actual/365 accrual fractions.
-Continuous compounding of zero rates.
-Linear interpolation of zero rates.
-No accrued interest at valuation.
-'''
-
-# MUREX EX 2 Q2
-
-def bond_price_from_yield(yield_rate):
-    price = 0
-
-    for payment_date,  coupon in zip(payment_dates, cashflows):
-        t = (payment_date - valuation_date).days/365
-        pv = coupon * np.exp(-yield_rate * t)
-        price += pv
-
-    #discounted principal repayment
-    T = (maturity_date - valuation_date).days /365
-    price += notional * np.exp(-yield_rate * T)
-
-    return price
-
-def yield_equation(yield_rate):
-    return bond_price_from_yield(yield_rate) - bond_npv
-
-
-#USE ROOT FINDER TO FIND THE YIELD THAT APROX MATCHES THE NPV
-bond_yield = brentq( yield_equation, -0.10, 0.20)
-
-print(f"Bond Yield: {bond_yield:.6%}")
-
-recalculated_price = bond_price_from_yield(bond_yield)
-
-'''
-print(f"Original NPV:     ${bond_npv:,.2f}")
-print(f"Recalculated NPV: ${recalculated_price:,.2f}")
-print(f"Difference:       ${recalculated_price - bond_npv:.8f}")
-'''
-
-#MUREX EX 2 Q3
 def value_bond(proj_rates, disc_rates):
 
     schedule = []
@@ -290,16 +113,70 @@ def calculate_npv(proj_rates, disc_rates):
     npv, _ = value_bond(proj_rates, disc_rates)
     return npv
 
-#BASE VALUATION WITH ORIGINAL RATES
+# MUREX EX 2 Q1: BOND VALUATION
+
 bond_npv, schedule = value_bond(
     projection_rates,
     discount_rates
 )
+
+total_coupon_pv = sum(
+    row["Coupon CF"] * row["Discount Factor"]
+    for row in schedule
+)
+
+principal_pv = sum(
+    row["Principal"] * row["Discount Factor"]
+    for row in schedule
+)
+
+#THEORETICAL BOND NPV
+print("\nBond Valuation Results")
+print(f"PV of Coupons:   ${total_coupon_pv:,.2f}")
+print(f"PV of Principal: ${principal_pv:,.2f}")
+print(f"Theoretical NPV: ${bond_npv:,.2f}")
+
+
 '''
-#TEST: Calculate NPV with original rates
-base_npv = calculate_npv(projection_rates, discount_rates)
-print(f"Base NPV: ${base_npv:,.2f}")
+ASSUMPTIONS Q1
+Unadjusted quarterly payment dates.
+Actual/365 accrual fractions.
+Continuous compounding of zero rates.
+Linear interpolation of zero rates.
+No accrued interest at valuation.
 '''
+
+# MUREX EX 2 Q2
+
+def bond_price_from_yield(yield_rate):
+    price = 0.0
+
+    for row in schedule:
+        t = (row["Payment Date"] - valuation_date).days / 365
+
+        coupon = row["Coupon CF"]
+        principal = row["Principal"]
+
+        total_cashflow = coupon + principal
+
+        pv = total_cashflow * np.exp(-yield_rate * t)
+
+        price += pv
+
+    return price
+
+def yield_equation(yield_rate):
+    return bond_price_from_yield(yield_rate) - bond_npv
+
+
+#USE ROOT FINDER TO FIND THE YIELD THAT APROX MATCHES THE NPV
+bond_yield = brentq( yield_equation, -0.10, 0.20)
+
+print(f"Bond Yield: {bond_yield:.6%}")
+
+recalculated_price = bond_price_from_yield(bond_yield)
+
+#MUREX EX 2 Q3
 
 # One basis point
 bp = 0.0001
