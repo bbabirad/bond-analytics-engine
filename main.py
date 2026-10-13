@@ -137,14 +137,6 @@ print(f"PV of Principal: ${principal_pv:,.2f}")
 print(f"Theoretical NPV: ${bond_npv:,.2f}")
 
 
-'''
-ASSUMPTIONS Q1
-Unadjusted quarterly payment dates.
-Actual/365 accrual fractions.
-Continuous compounding of zero rates.
-Linear interpolation of zero rates.
-No accrued interest at valuation.
-'''
 
 # MUREX EX 2 Q2
 
@@ -174,7 +166,6 @@ bond_yield = brentq( yield_equation, -0.10, 0.20)
 
 print(f"Bond Yield: {bond_yield:.6%}")
 
-recalculated_price = bond_price_from_yield(bond_yield)
 
 #MUREX EX 2 Q3
 
